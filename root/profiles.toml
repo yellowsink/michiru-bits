@@ -1,0 +1,45 @@
+version = "1"
+
+[global]
+	# see ionice(1)
+	ionice = true
+	ionice-class = 2 # best-effort
+	ionice-level = 6 # 0-7, low number is more priority
+
+	priority = "low" # cpu nice
+
+	# require some headroom before doing anything
+	min-memory = 100 # MB
+
+	scheduler = "crond"
+
+[default]
+	repository = "s3:s3.us-west-004.backblazeb2.com/michibak-services"
+	password-file = "restic_password.txt"
+	initialize = false
+
+	# mutex execution, handled by rprofile not restic
+	lock = "/tmp/resticprofile-services.lock"
+
+	# generate a status file for inspection later if the log isnt enough
+	status-file = "services-status.json"
+
+	[default.env]
+		AWS_ACCESS_KEY_ID = "REDACTED"
+		AWS_SECRET_ACCESS_KEY = "REDACTED"
+
+	[default.backup]
+		verbose = true
+		source = [ "/home/services" ]
+
+		schedule = "04:00:00" # every 4am
+		schedule-permission = "system"
+		schedule-lock-wait = "1h"
+		schedule-log = "/root/resticprofile-schedule-services.log"
+
+		# automatically bring down docker services first so databases are flushed etc
+		run-before = "/root/stop-restartable-services.sh"
+		run-after = "docker compose -f /home/services/docker-compose.yml start"
+	
+		# oh no! don't bring docker back up, and send me an email.
+		run-after-fail = "/root/email-restic-services-alert.sh"
